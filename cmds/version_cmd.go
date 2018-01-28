@@ -3,7 +3,7 @@ package cmds
 import (
 	"fmt"
 
-	"github.com/epsniff/gui/src/version"
+	"github.com/epsniff/spider/src"
 	"github.com/spf13/cobra"
 )
 
