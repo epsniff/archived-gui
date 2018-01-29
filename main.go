@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/epsniff/spider/cmds"
-	"github.com/epsniff/spider/telemetry"
-	"github.com/epsniff/spider/telemetry/loggergou"
+	"github.com/epsniff/spider/src/telemetry"
+	"github.com/epsniff/spider/src/telemetry/loggergou"
 	"github.com/spf13/cobra"
 )
 

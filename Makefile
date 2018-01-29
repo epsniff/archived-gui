@@ -20,17 +20,5 @@ vendor-ensure:
 	echo '-- running dep prune to rmeove unused packages --'
 	dep prune -v
 
-vendor-rebuild:
-	# Used to recreate the vendor directory. 
-	#
-	[ "$(CURDEPVER)" == "$(DEPVERDEF)" ]
-	echo "moving vendor/ to /tmp/vendor-backup-`date +%s`" 
-	mv  vendor/ /tmp/vendor-backup-`date +%s` || echo "already gone"
-	echo "moving Gopkg.lock to /tmp/Gopkg.lock-`date +%s`"
-	mv Gopkg.lock /tmp/Gopkg.lock-`date +%s` || echo "already gone"
-	echo '-- running dep ensure --'
-	dep ensure -v
-	echo '-- running dep prune to rmeove unused packages --'
-	dep prune -v
 
-	
+
