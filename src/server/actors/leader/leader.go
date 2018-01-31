@@ -61,7 +61,7 @@ func (a *LeaderActor) Act(c context.Context) {
 
 				// On new peers start the worker.
 				//TODO retry.X
-				_, err := a.client.Request(timeout, peer.Name(), start)
+				_, err := a.client.Request(a.cfg.timeout, peer.Name(), start)
 				if err != nil {
 					//TODO return an error / log an error
 					return

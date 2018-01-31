@@ -46,7 +46,14 @@ func (l *GouLogger) Info(msg string) {
 		gou.DoLog(linelvl, gou.INFO, msg)
 	}
 }
+
 func (l *GouLogger) Infof(format string, v ...interface{}) {
+	if gou.LogLevel >= gou.INFO {
+		gou.DoLog(linelvl, gou.INFO, fmt.Sprintf(format, v...))
+	}
+}
+
+func (l *GouLogger) Printf(format string, v ...interface{}) {
 	if gou.LogLevel >= gou.INFO {
 		gou.DoLog(linelvl, gou.INFO, fmt.Sprintf(format, v...))
 	}

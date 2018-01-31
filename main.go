@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/epsniff/spider/cmds"
+	"github.com/epsniff/spider/cmds/runserver"
 	"github.com/epsniff/spider/src/telemetry"
 	"github.com/epsniff/spider/src/telemetry/loggergou"
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ func main() {
 	}
 
 	root.AddCommand(cmds.VersionCmd)
+	root.AddCommand(runserver.ServerCmd)
 
 	root.Execute()
 }

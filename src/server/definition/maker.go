@@ -6,14 +6,18 @@ import (
 )
 
 type Maker struct {
-	//TODO add injection context
+	clientMaker func() (*grid.Client, error)
 }
 
-func New() (*Maker, error) {
-	return &Maker{}, nil
+func New(clientmaker func() (*grid.Client, error)) (*Maker, error) {
+	return &Maker{clientmaker}, nil
 }
 
 func (m *Maker) MakeLeader(_ []byte) (grid.Actor, error) {
 	cfg := &leader.Cfg{}
-	return leader.New(cfg)
+	gclient, err := m.clientMaker()
+	if err != nil {
+		return nil, err
+	}
+	return leader.New(gclient, cfg), nil
 }

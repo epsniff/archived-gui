@@ -11,4 +11,5 @@ type LoggerFace interface {
 	Infof(format string, v ...interface{})
 	Debug(msg string)
 	Debugf(format string, v ...interface{})
+	Printf(format string, v ...interface{})
 }
