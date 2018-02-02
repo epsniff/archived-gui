@@ -8,14 +8,15 @@ import (
 
 	"github.com/araddon/gou"
 	etcdv3 "github.com/coreos/etcd/clientv3"
-	"github.com/epsniff/spider/src/server/client"
+	"github.com/epsniff/spider/src/lib/gridclient"
+	"github.com/epsniff/spider/src/lib/logging"
 	"github.com/epsniff/spider/src/server/definition"
 	"github.com/epsniff/spider/src/server/name"
-	"github.com/epsniff/spider/src/telemetry"
 	"github.com/lytics/grid"
+	"github.com/lytics/grid/registry"
 )
 
-func RunServer(ctx context.Context, namespace, tcp, hostname string, port int, leaseDuration time.Duration, etcd *etcdv3.Client) error {
+func RunServer(ctx context.Context, namespace, hostIp string, port int, leaseDuration time.Duration, etcd *etcdv3.Client) error {
 
 	// Create a grid server configuration.
 	cfg := grid.ServerCfg{
@@ -32,7 +33,7 @@ func RunServer(ctx context.Context, namespace, tcp, hostname string, port int, l
 	// Register actor definitions.
 	def, err := definition.New(
 		func() (*grid.Client, error) {
-			return client.New(namespace, etcd)
+			return gridclient.New(namespace, etcd)
 		},
 	)
 	if err != nil {
@@ -41,10 +42,13 @@ func RunServer(ctx context.Context, namespace, tcp, hostname string, port int, l
 	server.RegisterDef(name.LeaderActor, def.MakeLeader)
 
 	// Setup the gRPC grid server
-	lis, err := net.Listen(tcp, fmt.Sprintf("%v:%d", hostname, port))
+	listenA := fmt.Sprintf("%v:%d", hostIp, port)
+	lis, err := net.Listen("tcp", listenA)
 	if err != nil {
-		return fmt.Errorf("failed listening on address and port: %s:%d: %v", hostname, port, err)
+		return fmt.Errorf("failed listening on:%v err:%v", listenA, err)
 	}
+
+	gou.Infof("starting server: bind_address:`%v`", listenA)
 	errout := make(chan error)
 	go func() {
 		defer close(errout)
@@ -54,16 +58,20 @@ func RunServer(ctx context.Context, namespace, tcp, hostname string, port int, l
 	// Wait for a shutdown signal or until we encounter an error
 	select {
 	case <-ctx.Done():
-		telemetry.Logger.Infof("grid received stop signal")
+		logging.Logger.Infof("grid received stop signal")
 		server.Stop()
 		err = <-errout
-		if err != nil {
-			telemetry.Logger.Warnf("received unexpected grid shutdown error: %v", err)
-		}
 	case err = <-errout:
-		telemetry.Logger.Warnf("received unexpected grid shutdown error: %v", err)
 	}
-	gou.Infof("grid shutdown complete")
+
+	switch err {
+	case nil:
+	case registry.ErrUnspecifiedNetAddressIP:
+		logging.Logger.Errorf("received bad address error from grid: address: `%v` error: %v", listenA, err)
+	default:
+		logging.Logger.Errorf("received unexpected grid error: %v", err)
+	}
+
 	return err
 
 }

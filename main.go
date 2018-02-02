@@ -6,13 +6,13 @@ import (
 
 	"github.com/epsniff/spider/cmds"
 	"github.com/epsniff/spider/cmds/runserver"
-	"github.com/epsniff/spider/src/telemetry"
-	"github.com/epsniff/spider/src/telemetry/loggergou"
+	"github.com/epsniff/spider/src/lib/logging"
+	"github.com/epsniff/spider/src/lib/logging/loggergou"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	telemetry.Logger = loggergou.New(log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile|log.Lmicroseconds), "debug")
+	logging.Logger = loggergou.New(log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile|log.Lmicroseconds), "debug")
 
 	root := &cobra.Command{
 		Use:   "spider",

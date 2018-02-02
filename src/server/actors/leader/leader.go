@@ -2,9 +2,9 @@ package leader
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/epsniff/spider/src/lib/logging"
 	"github.com/lytics/grid"
 )
 
@@ -33,7 +33,8 @@ func (a *LeaderActor) Act(c context.Context) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	fmt.Println("Starting Leader Actor")
+	logging.Logger.Infof("Starting Leader Actor")
+	defer logging.Logger.Infof("Exiting Leader Actor")
 
 	existing := make(map[string]bool)
 	for {
@@ -44,7 +45,7 @@ func (a *LeaderActor) Act(c context.Context) {
 			// Ask for current peers.
 			peers, err := a.client.Query(a.cfg.timeout, grid.Peers)
 			if err != nil {
-				//TODO return an error / log an error
+				logging.Logger.Errorf("got an error quering peers: err:%v", err)
 				return
 			}
 
@@ -63,7 +64,7 @@ func (a *LeaderActor) Act(c context.Context) {
 				//TODO retry.X
 				_, err := a.client.Request(a.cfg.timeout, peer.Name(), start)
 				if err != nil {
-					//TODO return an error / log an error
+					logging.Logger.Errorf("got an error starting actor:%v peer:%v err:%v", start, peer, err)
 					return
 				}
 			}
