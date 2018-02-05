@@ -1,0 +1,98 @@
+package scheduler
+
+import (
+	"context"
+	"time"
+
+	"github.com/epsniff/spider/src/lib/logging"
+	"github.com/epsniff/spider/src/server/scheduler/peertracker"
+	"github.com/lytics/grid"
+	"github.com/lytics/lio/src/linkgrid/name"
+	"github.com/lytics/retry"
+)
+
+const actorStartTimeout = 10 * time.Second
+
+type Scheduler struct {
+	ctx     context.Context
+	tracker *peertracker.Tracker
+	client  *grid.Client
+}
+
+func New(ctx context.Context, client *grid.Client) *Scheduler {
+	s := &Scheduler{
+		ctx:     ctx,
+		tracker: peertracker.New(),
+		client:  client,
+	}
+
+	return s
+}
+
+func (sm *Scheduler) Run() error {
+	current, peers, err := sm.client.QueryWatch(sm.ctx, grid.Peers)
+	if err != nil {
+		logging.Logger.Errorf("%v: fatal error: %v", sm, err)
+		return err
+	}
+
+	logging.Logger.Infof("%v: found %v current peers", sm, len(current))
+	for _, c := range current {
+		logging.Logger.Infof("%v: found existing peer: %v", sm, c.Peer())
+		sm.tracker.Live(c.Peer())
+		if err := sm.startPeerMonitor(c.Peer()); err != nil {
+			logging.Logger.Warnf("%v: failed to start peer monitor on: %v, error: %v", sm, c.Peer(), err)
+		}
+	}
+
+	for {
+		select {
+		case <-sm.ctx.Done():
+			return nil
+		case e := <-peers:
+			logging.Logger.Infof("%v: %v", sm, e)
+			switch e.Type {
+			case grid.WatchError:
+				logging.Logger.Errorf("%v: fatal error: %v", sm, e.Err())
+				return err
+			case grid.EntityLost:
+				sm.tracker.Dead(e.Peer())
+			case grid.EntityFound:
+				sm.tracker.Live(e.Peer())
+				if err := sm.startPeerMonitor(e.Peer()); err != nil {
+					logging.Logger.Warnf("%v: failed to start peer monitor on: %v, error: %v", sm, e.Peer(), err)
+				}
+			}
+		}
+	}
+}
+
+func (sm *Scheduler) startActor(def *grid.ActorStart) error {
+	pool := sm.tracker.PoolByType(def.GetType())
+
+	peer, err := pool.BestPeer(def)
+	if err != nil {
+		return err
+	}
+	logging.Logger.Infof("%v: starting actor: %v, on peer: %v", sm, def.Name, peer)
+	pool.OptimisticallyRegister(def.Name, peer)
+	_, err = sm.client.Request(actorStartTimeout, peer, def)
+	if err != nil {
+		pool.OptimisticallyUnregister(def.Name)
+		return err
+	}
+	return nil
+}
+
+func (sm *Scheduler) startPeerMonitor(peer string) error {
+	def := grid.NewActorStart(name.PeerMonitorActor(peer))
+	def.Type = name.PeerMonitorActorPrefix
+	def.Data = []byte(peer)
+
+	var err error
+	retry.X(3, 5*time.Second, func() bool {
+		_, err = sm.client.Request(actorStartTimeout, peer, def)
+		return err != nil
+	})
+	return err
+}

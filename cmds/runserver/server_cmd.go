@@ -21,11 +21,36 @@ var (
 		Short: "startup a new node in the cluster",
 		Run:   runServer,
 	}
+	// flags and defaults
+	address       = ":5503"
+	leaseDuration = 2 * time.Minute
+	namespace     = "default_namespace"
+	etcdServers   = []string{"localhost:2379"}
 )
+
+func init() {
+	ServerCmd.PersistentFlags().StringSliceVar(&etcdServers, "etcds", etcdServers, `which etcd servers to connect to`)
+	ServerCmd.PersistentFlags().StringVar(&namespace, "namespace", namespace, `
+		used to determine which namespace this grid should use. You'll need this if 
+		your running mutiple grid servers on the same etcd cluster.`)
+	ServerCmd.PersistentFlags().DurationVar(&leaseDuration, "lease_dur", leaseDuration, `
+		used to determine how long a peer can be missing before it's considered down`)
+	ServerCmd.PersistentFlags().StringVar(&address, "address", address, `
+		The 'ip:port' to bind grid's internal gRPC server to, e.g. 127.0.0.1:5503.  
+		If given in the form of ':5503' then we'll pick a non loopback address to bind 
+		to, as grid doesn't support binding to all interfaces.`)
+}
 
 func runServer(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Extract flags
+	a, err := nethelper.ValidateAddress(address)
+	if err != nil {
+		logging.Logger.Errorf("address failed validation: address:%v err:%v", address, err)
+	}
+	address = a
 
 	// Stop via signal.
 	go func() {
@@ -38,21 +63,13 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// TODO startup promethious metrics endpoint
 
-	hostIp, err := nethelper.BindableIP()
-	if err != nil {
-		logging.Logger.Errorf("error selecting a bindable IP address: err:%v", err)
-	}
-	const leaseDuration = 2 * time.Minute
-	const namespace = "default_namespace"
-	const port = 5503
-	var etcdServers = []string{"localhost:2379"}
 	etcdv3, err := etcdhelper.NewEdtcClient(etcdServers)
 	if err != nil {
 		logging.Logger.Errorf("error creating an etcd client with servers[%v]: err:%v", etcdServers, err)
 	}
 
 	for i := 0; i < 2; i++ {
-		err := server.RunServer(ctx, namespace, hostIp, port, leaseDuration, etcdv3)
+		err := server.RunServer(ctx, namespace, address, leaseDuration, etcdv3)
 		switch {
 		case err == nil || err == context.Canceled:
 			logging.Logger.Infof("server shutdown complete")
@@ -66,7 +83,7 @@ func runServer(cmd *cobra.Command, args []string) {
 				return
 			}
 		default:
-			logging.Logger.Errorf("the server returned an unexpected error: %v", err)
+			logging.Logger.Errorf("%v", err)
 			return
 		}
 	}
