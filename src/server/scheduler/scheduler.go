@@ -7,8 +7,6 @@ import (
 	"github.com/epsniff/spider/src/lib/logging"
 	"github.com/epsniff/spider/src/server/scheduler/peertracker"
 	"github.com/lytics/grid"
-	"github.com/lytics/lio/src/linkgrid/name"
-	"github.com/lytics/retry"
 )
 
 const actorStartTimeout = 10 * time.Second
@@ -59,7 +57,7 @@ func (sm *Scheduler) Run() error {
 				sm.tracker.Dead(e.Peer())
 			case grid.EntityFound:
 				sm.tracker.Live(e.Peer())
-				if err := sm.startPeerMonitor(e.Peer()); err != nil {
+				if err := peertracker.StartPeerMonitor(sm.client, e.Peer()); err != nil {
 					logging.Logger.Warnf("%v: failed to start peer monitor on: %v, error: %v", sm, e.Peer(), err)
 				}
 			}
@@ -82,17 +80,4 @@ func (sm *Scheduler) startActor(def *grid.ActorStart) error {
 		return err
 	}
 	return nil
-}
-
-func (sm *Scheduler) startPeerMonitor(peer string) error {
-	def := grid.NewActorStart(name.PeerMonitorActor(peer))
-	def.Type = name.PeerMonitorActorPrefix
-	def.Data = []byte(peer)
-
-	var err error
-	retry.X(3, 5*time.Second, func() bool {
-		_, err = sm.client.Request(actorStartTimeout, peer, def)
-		return err != nil
-	})
-	return err
 }
