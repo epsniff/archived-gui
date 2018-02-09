@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/epsniff/spider/src/lib/logging"
-	"github.com/epsniff/spider/src/server/scheduler/peertracker"
+	"github.com/epsniff/gui/src/lib/logging"
+	"github.com/epsniff/gui/src/server/scheduler/peertracker"
 	"github.com/lytics/grid"
 )
 

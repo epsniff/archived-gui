@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/epsniff/spider/src/lib/logging"
+	"github.com/epsniff/gui/src/lib/logging"
 	"github.com/lytics/grid"
 )
 

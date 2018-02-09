@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/araddon/gou"
-	"github.com/epsniff/spider/src/lib/logging"
-	"github.com/epsniff/spider/src/server/name"
+	"github.com/epsniff/gui/src/lib/logging"
+	"github.com/epsniff/gui/src/server/name"
 	"github.com/lytics/dfa"
 	"github.com/lytics/grid"
 )

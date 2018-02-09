@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/epsniff/spider/src/server/scheduler/peerinfo"
+	"github.com/epsniff/gui/src/server/scheduler/peerinfo"
 	"github.com/lytics/grid"
 )
 

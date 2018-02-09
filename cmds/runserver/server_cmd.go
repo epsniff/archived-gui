@@ -7,10 +7,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/epsniff/spider/src/lib/etcdhelper"
-	"github.com/epsniff/spider/src/lib/logging"
-	"github.com/epsniff/spider/src/lib/nethelper"
-	"github.com/epsniff/spider/src/server"
+	"github.com/epsniff/gui/src/lib/etcdhelper"
+	"github.com/epsniff/gui/src/lib/logging"
+	"github.com/epsniff/gui/src/lib/nethelper"
+	"github.com/epsniff/gui/src/server"
 	"github.com/lytics/grid"
 	"github.com/spf13/cobra"
 )

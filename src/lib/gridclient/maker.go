@@ -4,7 +4,7 @@ import (
 	"runtime"
 
 	etcdv3 "github.com/coreos/etcd/clientv3"
-	"github.com/epsniff/spider/src/lib/logging"
+	"github.com/epsniff/gui/src/lib/logging"
 	"github.com/lytics/grid"
 )
 

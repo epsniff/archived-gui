@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/epsniff/spider/src/server/scheduler/actorpool"
+	"github.com/epsniff/gui/src/server/scheduler/actorpool"
 )
 
 var (

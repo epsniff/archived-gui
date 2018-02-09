@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/epsniff/spider/src/server/scheduler/actorpool"
+	"github.com/epsniff/gui/src/server/scheduler/actorpool"
 )
 
 type ClusterStatus struct {

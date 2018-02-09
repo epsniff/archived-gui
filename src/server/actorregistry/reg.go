@@ -1,7 +1,7 @@
 package actorregistry
 
 import (
-	"github.com/epsniff/spider/src/server/actors/leader"
+	"github.com/epsniff/gui/src/server/actors/leader"
 	"github.com/lytics/grid"
 )
 

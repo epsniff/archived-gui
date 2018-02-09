@@ -8,10 +8,10 @@ import (
 
 	"github.com/araddon/gou"
 	etcdv3 "github.com/coreos/etcd/clientv3"
-	"github.com/epsniff/spider/src/lib/gridclient"
-	"github.com/epsniff/spider/src/lib/logging"
-	"github.com/epsniff/spider/src/server/actorregistry"
-	"github.com/epsniff/spider/src/server/name"
+	"github.com/epsniff/gui/src/lib/gridclient"
+	"github.com/epsniff/gui/src/lib/logging"
+	"github.com/epsniff/gui/src/server/actorregistry"
+	"github.com/epsniff/gui/src/server/name"
 	"github.com/lytics/grid"
 )
 
