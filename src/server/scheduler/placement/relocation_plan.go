@@ -1,4 +1,4 @@
-package actorpool
+package placement
 
 import (
 	"bytes"
