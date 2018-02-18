@@ -1,6 +1,9 @@
 package peerinfo
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func New(peer string) *PeerInfo {
 	return &PeerInfo{
@@ -20,4 +23,11 @@ type PeerInfo struct {
 
 func (pi *PeerInfo) NumActors() int {
 	return len(pi.Registered) + len(pi.OptimisticRegistered)
+}
+
+func (pi *PeerInfo) String() string {
+	return fmt.Sprintf(
+		`Name:%v State:%v OptimisticState:%v Registered:[%+v] OptimisticRegistered:[%+v]`,
+		pi.Name, pi.State, pi.OptimisticState, pi.Registered, pi.OptimisticRegistered,
+	)
 }

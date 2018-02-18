@@ -1,13 +1,15 @@
 package peertracker
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/lytics/grid"
 	"github.com/lytics/retry"
 )
 
-PeerMonitorActorPrefix     = "peer-monitor"
+const PeerMonitorActorPrefix = "peer-monitor"
+const actorStartTimeout = 10 * time.Second
 
 // PeerMonitorActor name.
 func PeerMonitorActor(peer string) string {
@@ -21,9 +23,8 @@ func StartPeerMonitor(client *grid.Client, peer string) error {
 
 	var err error
 	retry.X(3, 5*time.Second, func() bool {
-		_, err = sm.client.Request(actorStartTimeout, peer, def)
+		_, err = client.Request(actorStartTimeout, peer, def)
 		return err != nil
 	})
 	return err
 }
-

@@ -2,7 +2,7 @@ package peertracker
 
 import (
 	"errors"
-	"sort"
+	"sync"
 
 	"github.com/epsniff/gui/src/server/scheduler/actorpool"
 )
@@ -12,11 +12,6 @@ var (
 	ErrUnknownActorType           = errors.New("unknown actor type")
 )
 
-type selector struct {
-	activePeers    []string
-	peers    map[string]*peerinfo.PeerInfo
-}
-
 func New() *Tracker {
 	return &Tracker{
 		pools: map[string]*actorpool.ActorPool{},
@@ -24,31 +19,14 @@ func New() *Tracker {
 }
 
 type Tracker struct {
+	mu    sync.Mutex
 	pools map[string]*actorpool.ActorPool
 }
 
-func (pq *ActorPool) recalculateSelector() {
-	if len(pq.peers) == 0 {
-		pq.selector = selector{}
-		return
-	}
-
-	peers := []string{}
-	for name, pi := range pq.peers {
-		if pi.state == dead || pi.optimisticState == dead {
-			continue
-		}
-		if name == "" {
-			panic("empty peer name")
-		}
-		peers = append(peers, name)
-	}
-	sort.Strings(peers)
-
-	pq.selector.peers = peers
-}
-
 func (tr *Tracker) AddPool(pool *actorpool.ActorPool) error {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
 	_, ok := tr.pools[pool.ActorType()]
 	if ok {
 		return ErrActorTypeAlreadyRegistered
@@ -57,104 +35,57 @@ func (tr *Tracker) AddPool(pool *actorpool.ActorPool) error {
 	return nil
 }
 
-// Live peer.
 func (tr *Tracker) Live(peer string) {
-	pq.mu.Lock()
-	defer pq.mu.Unlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
-	if !isValidName(peer) {
-		return
+	for _, pool := range tr.pools {
+		pool.Live(peer)
 	}
-
-	pi, ok := pq.peers[peer]
-	if !ok {
-		pi = newPeerInfo(peer)
-		pq.peers[peer] = pi
-	}
-	pi.state = live
-	pi.optimisticState = live
-
-	// Recalculate which peers are next
-	// in the various selection schemes.
-	pq.recalculateSelector()
 }
 
-// OptimisticallyLive until an event marks the peer dead.
-// Currently this has no affect on scheduling.
-func (tr *Tracker) OptimisticallyLive(peer string) {
-	pq.mu.Lock()
-	defer pq.mu.Unlock()
-
-	if !isValidName(peer) {
-		return
-	}
-
-	pi, ok := pq.peers[peer]
-	if !ok {
-		pi = newPeerInfo(peer)
-		pq.peers[peer] = pi
-	}
-	pi.optimisticState = live
-
-	// In the optimistic "live" case don't actually
-	// recalculate the selector anything.
-}
-
-// Dead peer.
 func (tr *Tracker) Dead(peer string) {
-	pq.mu.Lock()
-	defer pq.mu.Unlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
-	if !isValidName(peer) {
-		return
+	for _, pool := range tr.pools {
+		pool.Dead(peer)
 	}
-
-	pi, ok := pq.peers[peer]
-	if !ok {
-		pi = newPeerInfo(peer)
-		pq.peers[peer] = pi
-	}
-	pi.state = dead
-	pi.optimisticState = dead
-
-	// Recalculate which peers are next
-	// in the various selection schemes.
-	pq.recalculateSelector()
 }
 
-// OptimisticallyDead until a real event marks the peer alive again.
-// Making the peer optimistically dead will remove it from any
-// scheduling, in other words, it will never be returned as a
-// peer from MinAssigned when marked optimistically dead.
+func (tr *Tracker) OptimisticallyLive(peer string) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	for _, pool := range tr.pools {
+		pool.OptimisticallyLive(peer)
+	}
+}
+
 func (tr *Tracker) OptimisticallyDead(peer string) {
-	pq.mu.Lock()
-	defer pq.mu.Unlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
-	if !isValidName(peer) {
-		return
+	for _, pool := range tr.pools {
+		pool.OptimisticallyDead(peer)
 	}
-
-	pi, ok := pq.peers[peer]
-	if !ok {
-		pi = newPeerInfo(peer)
-		pq.peers[peer] = pi
-	}
-	pi.optimisticState = dead
-
-	// Recalculate which peers are next
-	// in the various selection schemes.
-	pq.recalculateSelector()
 }
 
 func (tr *Tracker) Pools() map[string]*actorpool.ActorPool {
-	tmpcp := map[string]*actorpool.ActorPool{}
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	tmpCp := map[string]*actorpool.ActorPool{}
 	for key, pool := range tr.pools {
-		tmpcp[key] = pool
+		tmpCp[key] = pool
 	}
-	return tmpcp
+	return tmpCp
 }
 
 func (tr *Tracker) PoolByType(typ string) (*actorpool.ActorPool, error) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
 	pool, ok := tr.pools[typ]
 	if !ok {
 		return nil, ErrUnknownActorType
@@ -165,6 +96,9 @@ func (tr *Tracker) PoolByType(typ string) (*actorpool.ActorPool, error) {
 //returns a struct that represents all the peer queue's internal states used for logging and debugging
 // relocation issues.
 func (tr *Tracker) Status() *ClusterStatus {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
 	clusterState := map[string]*actorpool.PeersStatus{}
 	for actortype, pool := range tr.pools {
 		clusterState[actortype] = pool.Status()
