@@ -492,9 +492,14 @@ func TestSetMissingRequired(t *testing.T) {
 		t.Fatalf("expected 0 missing, got:%v", len(starts))
 	}
 
+	createWorker := func(id int, actorType string) (actorId string, actorDef *grid.ActorStart) {
+		actorDef = grid.NewActorStart(fmt.Sprintf("writer-%d", id))
+		actorDef.Type = actorType
+		return actorDef.Name, actorDef
+	}
+
 	for i := 0; i < 100; i++ {
-		actorDef := grid.NewActorStart(fmt.Sprintf("writer-%d", i))
-		id := actorDef.Name
+		id, actorDef := createWorker(i, "worker")
 		err := ap.SetRequired(actorDef)
 		if err != nil {
 			t.Fatalf("fot an setRequired error for actor:%+v err:%v", actorDef, err)
@@ -510,7 +515,7 @@ func TestSetMissingRequired(t *testing.T) {
 	}
 
 	for i := 0; i < 100; i++ {
-		id := fmt.Sprintf("writer-%d", i)
+		id, _ := createWorker(i, "worker")
 		ap.UnsetRequired(id)
 		if ap.IsRequired(id) {
 			t.Fatalf("expected not-required")
