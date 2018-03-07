@@ -230,6 +230,8 @@ func TestOptimisticallyRegisterUnregister(t *testing.T) {
 }
 
 /*
+TODO move
+
 func TestRelocateOne(t *testing.T) {
 	ap := New(true)
 
@@ -671,7 +673,7 @@ func TestEmptyActorStart(t *testing.T) {
 	t.Parallel()
 	ap := New(true)
 
-	if ErrInvalidName != ap.SetRequired(grid.NewActorStart("")) {
+	if ErrInvalidActorName != ap.SetRequired(grid.NewActorStart("")) {
 		t.Fatal("expected invalid name error")
 	}
 }

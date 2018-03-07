@@ -3,114 +3,39 @@ package actorpool
 import (
 	"math"
 	"sync"
-	"time"
 
 	"github.com/epsniff/gui/src/server/scheduler/peerinfo"
+	"github.com/epsniff/gui/src/server/scheduler/peerstate"
 )
 
-func newPeersState() *PeersState {
-	return &PeersState{
+func newActorPoolState(ps peerstate.PeersState) *ActorPoolState {
+	return &ActorPoolState{
 		mu:                   &sync.RWMutex{},
-		peers:                map[string]*peerinfo.PeerInfo{},
+		peers:                ps,
 		registered:           map[string]string{},
 		optimisticRegistered: map[string]string{},
 	}
 }
 
-// PeersState contains state of all the known and optimisiticaly started actors
+// ActorPoolState contains state of all the known and optimisiticaly started actors
 // and which peers they have been started on.
-type PeersState struct {
+type ActorPoolState struct {
 	mu *sync.RWMutex
 
-	peername string
-	// peername --> PeerInfo
-	peers map[string]*peerinfo.PeerInfo
+	peers peerstate.PeersState
 
 	//inverted maps (actorname --> peername)
 	registered           map[string]string
 	optimisticRegistered map[string]string
 }
 
-// State retrieves peer state.
-func (ps *PeersState) State(peer string) (state bool, optimisticstate bool) {
+func (ps *ActorPoolState) register(actor, peer string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	pi, ok := ps.peers[peer]
-	if !ok {
-		return false, false
-	}
-	state, optimisticstate = pi.State, pi.OptimisticState
-	return state, optimisticstate
-}
-
-// live peer.
-func (ps *PeersState) live(peer string) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
-	}
-	pi.State = live
-	pi.OptimisticState = live
-}
-
-// optimisticallyLive until an event marks the peer dead.
-// Currently this has no affect on scheduling.
-func (ps *PeersState) optimisticallyLive(peer string) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
-	}
-	pi.OptimisticState = live
-}
-
-// dead peer.
-func (ps *PeersState) dead(peer string) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
-	}
-	pi.State = dead
-	pi.OptimisticState = dead
-}
-
-// optimisticallyDead until a real event marks the peer alive again.
-// Making the peer optimistically dead will remove it from any
-// scheduling, in other words, it will never be returned as a
-// peer from MinAssigned when marked optimistically dead.
-func (ps *PeersState) optimisticallyDead(peer string) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
-	}
-	pi.OptimisticState = dead
-}
-
-func (ps *PeersState) register(actor, peer string) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		// TODO is this an invariance ?  should we allow a registration for an unknow peer?
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
+	pi, err := ps.peers.Get(peer)
+	if err != nil {
+		return err
 	}
 
 	// CRITICAL
@@ -118,84 +43,59 @@ func (ps *PeersState) register(actor, peer string) {
 	// under a different peer. This could happen
 	// if registered is called twice without a
 	// unregister inbetween.
-	if oldpeer, ok := ps.registered[actor]; ok {
-		oldPi, ok := ps.peers[oldpeer]
-		if !ok {
-			panic("optimisticRegistered pointed to a non existing peer name???")
-		}
-		delete(oldPi.Registered, actor)
-		delete(ps.registered, actor)
-	}
+	delete(ps.registered, actor)
+
 	// Check if the actor was optimistically assigned
 	// to a peer. Since this method represents a REAL
 	// registration, it overrides any optimistic
 	// registration.
 	if oldpeer, ok := ps.optimisticRegistered[actor]; ok {
-		oldPi, ok := ps.peers[oldpeer]
-		if !ok {
-			panic("optimisticRegistered pointed to a non existing peer name???")
-		}
-		delete(oldPi.OptimisticRegistered, actor)
 		delete(ps.optimisticRegistered, actor)
 	}
-
-	// Update the set of actors for
-	// this peer.
-	pi.Registered[actor] = true
 
 	// Update the global actor to peer
 	// mapping.
 	ps.registered[actor] = pi.Name
+
+	return nil
 }
 
 // unregister the actor from its current peer.
-func (ps *PeersState) unregister(actor string) {
+func (ps *ActorPoolState) unregister(actor string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
 	if !isValidName(actor) {
-		return
+		return ErrInvalidActorName
 	}
 
 	// Remove optimistic registrations, since
 	// this is a REAL unregister, the actor
 	// is for sure not running.
-	if opeer, ok := ps.optimisticRegistered[actor]; ok {
-		oPi, ok := ps.peers[opeer]
-		if !ok {
-			panic("optimisticRegistered pointed to a non existing peer name???")
-		}
-		delete(oPi.OptimisticRegistered, actor)
-		delete(ps.optimisticRegistered, actor)
-	}
+	delete(ps.optimisticRegistered, actor)
 
 	peer, ok := ps.registered[actor]
 	if !ok {
-		return
+		return ErrActorNotRegistered
 	}
 
-	pi, ok := ps.peers[peer]
-	if !ok {
-		panic("optimisticRegistered pointed to a non existing peer name???")
+	pi, err := ps.peers.Get(peer)
+	if err != nil {
+		return err
 	}
 
 	// Remove registrations.
-	if _, ok = ps.registered[actor]; !ok {
-		// Never registered.
-		return
-	}
-	delete(pi.Registered, actor)
 	delete(ps.registered, actor)
+	return nil
 }
 
-func (ps *PeersState) optimisticallyRegister(actor, peer string) {
+func (ps *ActorPoolState) optimisticallyRegister(actor, peer string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
+	pi, err := ps.peers.Get(peer)
+	if err != nil {
+		return err
 	}
 
 	// CRITICAL
@@ -203,29 +103,20 @@ func (ps *PeersState) optimisticallyRegister(actor, peer string) {
 	// under a different peer. This could happen
 	// if optimistic-registered is called twice
 	// without a unregister inbetween.
-	if oldpeer, ok := ps.optimisticRegistered[actor]; ok {
-		oldPi, ok := ps.peers[oldpeer]
-		if !ok {
-			panic("optimisticRegistered pointed to a non existing peer name???")
-		}
-		delete(oldPi.OptimisticRegistered, actor)
-		delete(ps.optimisticRegistered, actor)
-	}
-
-	// Update the set of actors for
-	// this peer.
-	pi.OptimisticRegistered[actor] = time.Now()
+	delete(ps.optimisticRegistered, actor)
 
 	// Update the global actor to peer
 	// mapping.
 	ps.optimisticRegistered[actor] = pi.Name
+
+	return nil
 }
 
 // optimisticallyUnregister the actor, ie: no confirmation has
 // arrived that the actor is NOT running on the peer, but
 // perhaps because of a failed request to the peer to start
 // the actor it is known that likely the actor is not running.
-func (ps *PeersState) optimisticallyUnregister(actor string) {
+func (ps *ActorPoolState) optimisticallyUnregister(actor string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
@@ -246,7 +137,7 @@ func (ps *PeersState) optimisticallyUnregister(actor string) {
 }
 
 // Registered returns a copy of the peerstate's map of actorname --> peername.
-func (ps *PeersState) Registered() map[string]string {
+func (ps *ActorPoolState) Registered() map[string]string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -259,7 +150,7 @@ func (ps *PeersState) Registered() map[string]string {
 
 // IsRegistered returns true if the actor has been
 // registered.
-func (ps *PeersState) IsRegistered(actorName string) bool {
+func (ps *ActorPoolState) IsRegistered(actorName string) bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -268,7 +159,7 @@ func (ps *PeersState) IsRegistered(actorName string) bool {
 }
 
 // OptimisticallyRegister returns a copy of the peerstate's map of actorname --> peername.
-func (ps *PeersState) OptimisticallyRegister() map[string]string {
+func (ps *ActorPoolState) OptimisticallyRegister() map[string]string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -281,7 +172,7 @@ func (ps *PeersState) OptimisticallyRegister() map[string]string {
 
 // IsOptimisticallyRegister returns true if the actor
 // has been optimistically registered.
-func (ps *PeersState) IsOptimisticallyRegister(actor string) bool {
+func (ps *ActorPoolState) IsOptimisticallyRegister(actor string) bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -291,7 +182,7 @@ func (ps *PeersState) IsOptimisticallyRegister(actor string) bool {
 
 // NumRegistered returns the current number of actors
 // registered.
-func (ps *PeersState) NumRegistered() int {
+func (ps *ActorPoolState) NumRegistered() int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -300,7 +191,7 @@ func (ps *PeersState) NumRegistered() int {
 
 // NumOptimisticallyRegistered returns the current number
 // of actors optimistically registered.
-func (ps *PeersState) NumOptimisticallyRegistered() int {
+func (ps *ActorPoolState) NumOptimisticallyRegistered() int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -308,7 +199,7 @@ func (ps *PeersState) NumOptimisticallyRegistered() int {
 }
 
 // NumRegisteredOn the peer.
-func (ps *PeersState) NumRegisteredOn(peer string) int {
+func (ps *ActorPoolState) NumRegisteredOn(peer string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -320,7 +211,7 @@ func (ps *PeersState) NumRegisteredOn(peer string) int {
 }
 
 // NumOptimisticallyRegisteredOn the peer.
-func (ps *PeersState) NumOptimisticallyRegisteredOn(peer string) int {
+func (ps *ActorPoolState) NumOptimisticallyRegisteredOn(peer string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -332,7 +223,7 @@ func (ps *PeersState) NumOptimisticallyRegisteredOn(peer string) int {
 }
 
 //returns a struct that represents this peer queue's internal state.  Used for loggging.
-func (ps *PeersState) Status() *PeersStatus {
+func (ps *ActorPoolState) Status() *PeersStatus {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
@@ -344,7 +235,7 @@ func (ps *PeersState) Status() *PeersStatus {
 
 	pcnt := 0
 	for _, p := range ps.peers {
-		if p.State == live {
+		if p.State == peerstate.Live {
 			pcnt++
 		}
 	}

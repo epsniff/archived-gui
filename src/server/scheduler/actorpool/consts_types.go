@@ -2,13 +2,10 @@ package actorpool
 
 import "errors"
 
-const (
-	live = true
-	dead = false
-)
-
 var (
-	ErrEmpty             = errors.New("empty")
-	ErrInvalidName       = errors.New("invalid name")
-	ErrActorTypeMismatch = errors.New("actor type mismatch")
+	ErrEmpty              = errors.New("empty")
+	ErrInvalidActorName   = errors.New("invalid actor name")
+	ErrInvalidPeerName    = errors.New("invalid peer name")
+	ErrActorTypeMismatch  = errors.New("actor type mismatch")
+	ErrActorNotRegistered = errors.New("actor not registered")
 )

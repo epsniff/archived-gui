@@ -5,12 +5,15 @@ import (
 	"sync"
 
 	"github.com/epsniff/gui/src/server/scheduler/actorpool"
+	"github.com/lytics/grid"
 )
 
 var (
-	ErrActorTypeAlreadyRegistered = errors.New("actor type already registered")
-	ErrUnknownActorType           = errors.New("unknown actor type")
+	ErrActorPoolAlreadyRegistered = errors.New("actor pool name already registered")
+	ErrUnknownPoolName            = errors.New("unknown actor pool name")
 )
+
+type poolname string
 
 func New() *Tracker {
 	return &Tracker{
@@ -23,15 +26,15 @@ type Tracker struct {
 	pools map[string]*actorpool.ActorPool
 }
 
-func (tr *Tracker) AddPool(pool *actorpool.ActorPool) error {
+func (tr *Tracker) AddPool(name string, pool *actorpool.ActorPool) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	_, ok := tr.pools[pool.ActorType()]
+	_, ok := tr.pools[name]
 	if ok {
-		return ErrActorTypeAlreadyRegistered
+		return ErrActorPoolAlreadyRegistered
 	}
-	tr.pools[pool.ActorType()] = pool
+	tr.pools[name] = pool
 	return nil
 }
 
@@ -71,6 +74,19 @@ func (tr *Tracker) OptimisticallyDead(peer string) {
 	}
 }
 
+func (tr *Tracker) Register(poolName, actor, peer string) error {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	pool, ok := tr.pools[poolName]
+	if !ok {
+		return ErrUnknownPoolName
+	}
+
+	return pool.Register(actor, peer)
+
+}
+
 func (tr *Tracker) Pools() map[string]*actorpool.ActorPool {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
@@ -82,13 +98,13 @@ func (tr *Tracker) Pools() map[string]*actorpool.ActorPool {
 	return tmpCp
 }
 
-func (tr *Tracker) PoolByType(typ string) (*actorpool.ActorPool, error) {
+func (tr *Tracker) PoolBy(name string) (*actorpool.ActorPool, error) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	pool, ok := tr.pools[typ]
+	pool, ok := tr.pools[name]
 	if !ok {
-		return nil, ErrUnknownActorType
+		return nil, ErrUnknownPoolName
 	}
 	return pool, nil
 }
@@ -100,21 +116,12 @@ func (tr *Tracker) Status() *ClusterStatus {
 	defer tr.mu.Unlock()
 
 	clusterState := map[string]*actorpool.PeersStatus{}
-	for actortype, pool := range tr.pools {
-		clusterState[actortype] = pool.Status()
+	for name, pool := range tr.pools {
+		clusterState[name] = pool.Status()
 	}
 	return &ClusterStatus{
 		ClusterState: clusterState,
 	}
-}
-
-/*
-func (tr *Tracker) BestPeer(def *grid.ActorStart) (string, error) {
-	pool, ok := tr.pools[def.Type]
-	if !ok {
-		return "", ErrUnknownActorType
-	}
-	return pool.ByHash(def.Name)
 }
 
 func (tr *Tracker) Missing() []*grid.ActorStart {
@@ -124,5 +131,14 @@ func (tr *Tracker) Missing() []*grid.ActorStart {
 		all = append(all, defs...)
 	}
 	return all
+}
+
+/*
+func (tr *Tracker) BestPeer(def *grid.ActorStart) (string, error) {
+	pool, ok := tr.pools[def.Type]
+	if !ok {
+		return "", ErrUnknownActorType
+	}
+	return pool.ByHash(def.Name)
 }
 */
