@@ -5,176 +5,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/epsniff/gui/src/server/scheduler/peerstate"
 	"github.com/lytics/grid"
 )
-
-func TestPeerOptimisticallyLive(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-
-	ap := New(true)
-	for p := range peers {
-		ap.OptimisticallyLive(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != dead {
-			t.Fatal("expected live peer")
-		}
-		if optimisticState != live {
-			t.Fatal("expected live peer")
-		}
-	}
-}
-
-func TestPeerLive(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-
-	ap := New(true)
-
-	for p := range peers {
-		ap.Live(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != live {
-			t.Fatal("expected live peer")
-		}
-		if optimisticState != live {
-			t.Fatal("expected live peer")
-		}
-	}
-}
-func TestPeerOptimisticallyLiveToLive(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-
-	ap := New(true)
-	for p := range peers {
-		ap.OptimisticallyLive(p)
-	}
-	for p := range peers {
-		ap.Live(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != live {
-			t.Fatal("expected live peer")
-		}
-		if optimisticState != live {
-			t.Fatal("expected live peer")
-		}
-	}
-}
-
-func TestPeerOptimisticallyDead(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-	ap := New(true)
-
-	for p := range peers {
-		ap.Live(p)
-	}
-	for p := range peers {
-		ap.OptimisticallyDead(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != live {
-			t.Fatal("expected live peer")
-		}
-		if optimisticState != dead {
-			t.Fatal("expected live peer")
-		}
-	}
-}
-
-func TestPeerDead(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-	ap := New(true)
-
-	for p := range peers {
-		ap.Live(p)
-	}
-	for p := range peers {
-		ap.Dead(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != dead {
-			t.Fatal("expected live peer")
-		}
-		if optimisticState != dead {
-			t.Fatal("expected live peer")
-		}
-	}
-}
-
-func TestPeerOptimisticallyDeadToDead(t *testing.T) {
-	t.Parallel()
-	peers := map[string]bool{
-		"peer0": true,
-		"peer1": true,
-	}
-	ap := New(true)
-
-	for p := range peers {
-		ap.Live(p)
-	}
-	for p := range peers {
-		ap.OptimisticallyDead(p)
-	}
-	for p := range peers {
-		ap.Dead(p)
-	}
-	for p := range peers {
-		state, optimisticState := ap.peerState.State(p)
-		if state != dead {
-			t.Fatal("expected dead peer")
-		}
-		if optimisticState != dead {
-			t.Fatal("expected dead peer")
-		}
-	}
-}
-
-func TestDeadPeerThatWasNeverLive(t *testing.T) {
-	t.Parallel()
-	ap := New(true)
-
-	ap.Dead("peer0")
-	state, optimisticState := ap.peerState.State("peer0")
-	if state != dead {
-		t.Fatal("expected dead peer")
-	}
-	if optimisticState != dead {
-		t.Fatal("expected dead peer")
-	}
-}
 
 func TestRegisterThenUnregister(t *testing.T) {
 	t.Parallel()
 
-	ap := New(true)
+	ps := peerstate.New()
+	ps.Live("peer0")
+	ap := New(true, ps)
 
-	ap.Live("peer0")
 	ap.Register("writer0", "peer0")
 
 	if ap.NumRegistered() != 1 {
@@ -202,9 +43,10 @@ func TestRegisterThenUnregister(t *testing.T) {
 func TestOptimisticallyRegisterUnregister(t *testing.T) {
 	t.Parallel()
 
-	ap := New(true)
+	ps := peerstate.New()
+	ps.Live("peer0")
+	ap := New(true, ps)
 
-	ap.Live("peer0")
 	ap.OptimisticallyRegister("writer0", "peer0")
 
 	if ap.NumOptimisticallyRegistered() != 1 {
@@ -458,7 +300,8 @@ func TestRegisterRemoveOptimisticallyRegistered(t *testing.T) {
 
 func TestSetUnsetRequired(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	ap.SetRequired(grid.NewActorStart("writer"))
 	if !ap.IsRequired("writer") {
@@ -472,7 +315,8 @@ func TestSetUnsetRequired(t *testing.T) {
 
 func TestSetMissingRequired(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	ap.SetRequired(grid.NewActorStart("writer"))
 	if !ap.IsRequired("writer") {
@@ -533,13 +377,15 @@ func TestSetMissingRequired(t *testing.T) {
 
 func TestNoActorsOnNewPeer(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	if ap.NumRegisteredOn("peer0") != 0 {
 		t.Fatal("expected 0 registered")
 	}
 
-	ap.Live("peer0")
+	ps.Live("peer0")
 	if ap.NumRegisteredOn("peer0") != 0 {
 		t.Fatal("expected 0 registered")
 	}
@@ -547,14 +393,19 @@ func TestNoActorsOnNewPeer(t *testing.T) {
 
 func TestNumRegisteredOn(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	if ap.NumRegisteredOn("peer0") != 0 {
 		t.Fatal("expected 0 registered")
 	}
 
-	ap.Live("peer0")
-	ap.Register("writer0", "peer0")
+	ps.Live("peer0")
+	err := ap.Register("writer0", "peer0")
+	if err != nil {
+		t.Fatalf("unexpected error:%v", err)
+	}
 	if ap.NumRegisteredOn("peer0") != 1 {
 		t.Fatal("expected 1 registered")
 	}
@@ -562,13 +413,14 @@ func TestNumRegisteredOn(t *testing.T) {
 
 func TestNumOptimisticallyRegisteredOn(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	if ap.NumOptimisticallyRegisteredOn("peer0") != 0 {
 		t.Fatal("expected 0 registered")
 	}
 
-	ap.Live("peer0")
+	ps.Live("peer0")
 	ap.OptimisticallyRegister("writer0", "peer0")
 	if ap.NumOptimisticallyRegisteredOn("peer0") != 1 {
 		t.Fatal("expected 1 registered")
@@ -577,33 +429,48 @@ func TestNumOptimisticallyRegisteredOn(t *testing.T) {
 
 func TestRegisterWithZeroPeers(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
-	ap.Register("writer0", "peer0")
-	if ap.NumRegistered() != 1 {
-		t.Fatal("expected 1 registered")
+	err := ap.Register("writer0", "peer0")
+	if err != peerstate.ErrUnknownPeerName {
+		t.Fatal("expected an error")
+	}
+	if ap.NumRegistered() != 0 {
+		t.Fatal("expected 0 registered")
 	}
 }
 
 func TestOptimisticallyRegisterWithZeroPeers(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
-	ap.OptimisticallyRegister("writer0", "peer0")
-	if ap.NumOptimisticallyRegistered() != 1 {
+	err := ap.OptimisticallyRegister("writer0", "peer0")
+	if err != peerstate.ErrUnknownPeerName {
+		t.Fatal("expected an error")
+	}
+	if ap.NumOptimisticallyRegistered() != 0 {
 		t.Fatal("expected 1 registered")
 	}
 }
 
 func TestRegisterTwiceWithoutUnregister(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
-	ap.Live("peer0")
-	ap.Live("peer1")
+	ps.Live("peer0")
+	ps.Live("peer1")
 
-	ap.Register("writer0", "peer0")
-	ap.Register("writer0", "peer1")
+	err := ap.Register("writer0", "peer0")
+	if err != nil {
+		t.Fatalf("unexpected error:%v", err)
+	}
+	err = ap.Register("writer0", "peer1")
+	if err != nil {
+		t.Fatalf("unexpected error:%v", err)
+	}
 
 	if ap.NumRegisteredOn("peer0") != 0 {
 		t.Fatal("expected 0 registered on peer")
@@ -615,10 +482,11 @@ func TestRegisterTwiceWithoutUnregister(t *testing.T) {
 
 func TestOptimisticallyRegisterTwiceWithoutUnregister(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
-	ap.Live("peer0")
-	ap.Live("peer1")
+	ps.Live("peer0")
+	ps.Live("peer1")
 
 	ap.OptimisticallyRegister("writer0", "peer0")
 	ap.OptimisticallyRegister("writer0", "peer1")
@@ -627,8 +495,13 @@ func TestOptimisticallyRegisterTwiceWithoutUnregister(t *testing.T) {
 
 	if p0 != 0 {
 		l := []string{}
-		for _, p := range ap.peerState.peers {
-			l = append(l, fmt.Sprintf("%v\n", p))
+		l = append(l, "opt-reg:\n")
+		for a, p := range ap.actorPoolState.optimisticRegistered {
+			l = append(l, fmt.Sprintf(" %v -> %v\n", a, p))
+		}
+		l = append(l, "reg:\n")
+		for a, p := range ap.actorPoolState.registered {
+			l = append(l, fmt.Sprintf(" %v -> %v\n", a, p))
 		}
 		t.Fatalf("expected 0 on peer0: got: peer0:%v peer1:%v peers:\n%+v",
 			p0, p1, strings.Join(l, "\n"))
@@ -640,9 +513,10 @@ func TestOptimisticallyRegisterTwiceWithoutUnregister(t *testing.T) {
 
 func TestUnregisterWithOptimisticallyRegistered(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
-	ap.Live("peer0")
+	ps.Live("peer0")
 	ap.OptimisticallyRegister("writer0", "peer0")
 	if ap.NumOptimisticallyRegisteredOn("peer0") != 1 {
 		t.Fatal("expected 1 registered on peer")
@@ -651,8 +525,13 @@ func TestUnregisterWithOptimisticallyRegistered(t *testing.T) {
 	op0 := ap.NumOptimisticallyRegisteredOn("peer0")
 	if op0 != 0 {
 		l := []string{}
-		for _, p := range ap.peerState.peers {
-			l = append(l, fmt.Sprintf("%v\n", p))
+		l = append(l, "opt-reg:\n")
+		for a, p := range ap.actorPoolState.optimisticRegistered {
+			l = append(l, fmt.Sprintf(" %v -> %v\n", a, p))
+		}
+		l = append(l, "reg:\n")
+		for a, p := range ap.actorPoolState.registered {
+			l = append(l, fmt.Sprintf(" %v -> %v\n", a, p))
 		}
 		t.Fatalf("expected 0 on peer0: got: peer0:%v peers:\n%+v",
 			op0, strings.Join(l, "\n"))
@@ -671,7 +550,9 @@ func TestIsValidName(t *testing.T) {
 
 func TestEmptyActorStart(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	if ErrInvalidActorName != ap.SetRequired(grid.NewActorStart("")) {
 		t.Fatal("expected invalid name error")
@@ -680,35 +561,43 @@ func TestEmptyActorStart(t *testing.T) {
 
 func TestEmptyPeerLiveDead(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	checkNoEntry := func() {
-		if _, ok := ap.peerState.peers[""]; ok {
+		if len(ap.actorPoolState.registered) != 0 {
+			t.Fatal("expected no peer info")
+		}
+		if len(ap.actorPoolState.optimisticRegistered) != 0 {
 			t.Fatal("expected no peer info")
 		}
 	}
 
-	ap.Live("")
+	ps.Live("")
 	checkNoEntry()
 
-	ap.Dead("")
+	ps.Dead("")
 	checkNoEntry()
 
-	ap.OptimisticallyLive("")
+	ps.OptimisticallyLive("")
 	checkNoEntry()
 
-	ap.OptimisticallyDead("")
+	ps.OptimisticallyDead("")
 	checkNoEntry()
 }
 
 func TestEmptyActorRegisterUnregister(t *testing.T) {
 	t.Parallel()
-	ap := New(true)
+	ps := peerstate.New()
+	ap := New(true, ps)
 
 	const validPeer = "peer-1"
 
 	checkNoEntry := func() {
-		if _, ok := ap.peerState.peers[validPeer]; ok {
+		if len(ap.actorPoolState.registered) != 0 {
+			t.Fatal("expected no peer info")
+		}
+		if len(ap.actorPoolState.optimisticRegistered) != 0 {
 			t.Fatal("expected no peer info")
 		}
 	}

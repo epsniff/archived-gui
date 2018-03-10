@@ -26,8 +26,14 @@ type PeersState interface {
 	Get(peer string) (*peerinfo.PeerInfo, error)
 }
 
-//ensure that peersState meets our interface.
-var _ PeersState = &peersState{}
+func New() PeersState {
+	ps := &peersState{
+		mu:    &sync.RWMutex{},
+		peers: map[string]*peerinfo.PeerInfo{},
+	}
+
+	return ps
+}
 
 // peersState contains state of all the known and optimisiticaly started actors
 // and which peers they have been started on.

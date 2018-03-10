@@ -124,8 +124,7 @@ func (ap *ActorPool) Register(actor, peer string) error {
 	if !isValidName(peer) {
 		return ErrInvalidPeerName
 	}
-	ap.actorPoolState.register(actor, peer)
-	return nil
+	return ap.actorPoolState.register(actor, peer)
 }
 
 // OptimisticallyRegister an actor, ie: no confirmation has
@@ -138,8 +137,7 @@ func (ap *ActorPool) OptimisticallyRegister(actor, peer string) error {
 	if !isValidName(peer) {
 		return ErrInvalidPeerName
 	}
-	ap.actorPoolState.optimisticallyRegister(actor, peer)
-	return nil
+	return ap.actorPoolState.optimisticallyRegister(actor, peer)
 }
 
 // Unregister the actor from its current peer.
@@ -147,8 +145,7 @@ func (ap *ActorPool) Unregister(actor string) error {
 	if !isValidName(actor) {
 		return ErrInvalidActorName
 	}
-	ap.actorPoolState.unregister(actor)
-	return nil
+	return ap.actorPoolState.unregister(actor)
 }
 
 // OptimisticallyUnregister the actor, ie: no confirmation has
@@ -159,16 +156,16 @@ func (ap *ActorPool) OptimisticallyUnregister(actor string) error {
 	if !isValidName(actor) {
 		return ErrInvalidActorName
 	}
-	ap.actorPoolState.optimisticallyUnregister(actor)
-	return nil
+	return ap.actorPoolState.optimisticallyUnregister(actor)
 }
 
+/*
 //Status returns a struct that represents all the peer queue's internal states used
 //for logging and debugging
 func (ap *ActorPool) Status() *PeersStatus {
 	return ap.actorPoolState.Status()
 }
-
+*/
 func isValidName(name string) bool {
 	return name != ""
 }

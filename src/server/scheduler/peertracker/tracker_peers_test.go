@@ -2,8 +2,6 @@ package peertracker
 
 import (
 	"testing"
-
-	"github.com/epsniff/gui/src/server/scheduler/actorpool"
 )
 
 func TestPeerOptimisticallyLive(t *testing.T) {
@@ -14,8 +12,8 @@ func TestPeerOptimisticallyLive(t *testing.T) {
 	}
 
 	tr := New()
-	tr.AddPool("pool1", actorpool.New(true))
-	tr.AddPool("pool2", actorpool.New(true))
+	tr.CreateActorPool("pool1", true)
+	tr.CreateActorPool("pool2", true)
 	for p := range peers {
 		tr.OptimisticallyLive(p)
 	}

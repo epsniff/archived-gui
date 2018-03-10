@@ -1,10 +1,8 @@
 package actorpool
 
 import (
-	"math"
 	"sync"
 
-	"github.com/epsniff/gui/src/server/scheduler/peerinfo"
 	"github.com/epsniff/gui/src/server/scheduler/peerstate"
 )
 
@@ -49,9 +47,7 @@ func (ps *ActorPoolState) register(actor, peer string) error {
 	// to a peer. Since this method represents a REAL
 	// registration, it overrides any optimistic
 	// registration.
-	if oldpeer, ok := ps.optimisticRegistered[actor]; ok {
-		delete(ps.optimisticRegistered, actor)
-	}
+	delete(ps.optimisticRegistered, actor)
 
 	// Update the global actor to peer
 	// mapping.
@@ -74,14 +70,9 @@ func (ps *ActorPoolState) unregister(actor string) error {
 	// is for sure not running.
 	delete(ps.optimisticRegistered, actor)
 
-	peer, ok := ps.registered[actor]
+	_, ok := ps.registered[actor]
 	if !ok {
 		return ErrActorNotRegistered
-	}
-
-	pi, err := ps.peers.Get(peer)
-	if err != nil {
-		return err
 	}
 
 	// Remove registrations.
@@ -116,24 +107,12 @@ func (ps *ActorPoolState) optimisticallyRegister(actor, peer string) error {
 // arrived that the actor is NOT running on the peer, but
 // perhaps because of a failed request to the peer to start
 // the actor it is known that likely the actor is not running.
-func (ps *ActorPoolState) optimisticallyUnregister(actor string) {
+func (ps *ActorPoolState) optimisticallyUnregister(actor string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	peer, ok := ps.optimisticRegistered[actor]
-	if !ok {
-		// Never registered.
-		return
-	}
-
-	pi, ok := ps.peers[peer]
-	if !ok {
-		pi = peerinfo.New(peer)
-		ps.peers[peer] = pi
-	}
-
-	delete(pi.OptimisticRegistered, actor)
 	delete(ps.optimisticRegistered, actor)
+	return nil
 }
 
 // Registered returns a copy of the peerstate's map of actorname --> peername.
@@ -203,11 +182,13 @@ func (ps *ActorPoolState) NumRegisteredOn(peer string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
-	pi, ok := ps.peers[peer]
-	if !ok {
-		return 0
+	cnt := 0
+	for _, p := range ps.registered {
+		if p == peer {
+			cnt++
+		}
 	}
-	return len(pi.Registered)
+	return cnt
 }
 
 // NumOptimisticallyRegisteredOn the peer.
@@ -215,13 +196,16 @@ func (ps *ActorPoolState) NumOptimisticallyRegisteredOn(peer string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 
-	pi, ok := ps.peers[peer]
-	if !ok {
-		return 0
+	cnt := 0
+	for _, p := range ps.optimisticRegistered {
+		if p == peer {
+			cnt++
+		}
 	}
-	return len(pi.OptimisticRegistered)
+	return cnt
 }
 
+/*
 //returns a struct that represents this peer queue's internal state.  Used for loggging.
 func (ps *ActorPoolState) Status() *PeersStatus {
 	ps.mu.RLock()
@@ -234,7 +218,7 @@ func (ps *ActorPoolState) Status() *PeersStatus {
 	}
 
 	pcnt := 0
-	for _, p := range ps.peers {
+	for _, p := range ps.peers.Get {
 		if p.State == peerstate.Live {
 			pcnt++
 		}
@@ -298,3 +282,4 @@ func (ps *ActorPoolState) Status() *PeersStatus {
 		OptimisticRegistered: optimisticRegistered,
 	}
 }
+*/

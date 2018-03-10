@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/epsniff/gui/src/server/scheduler/actorpool"
+	"github.com/epsniff/gui/src/server/scheduler/peerstate"
 	"github.com/lytics/grid"
 )
 
@@ -17,16 +18,18 @@ type poolname string
 
 func New() *Tracker {
 	return &Tracker{
-		pools: map[string]*actorpool.ActorPool{},
+		pools:     map[string]*actorpool.ActorPool{},
+		peerState: peerstate.New(),
 	}
 }
 
 type Tracker struct {
-	mu    sync.Mutex
-	pools map[string]*actorpool.ActorPool
+	mu        sync.Mutex
+	pools     map[string]*actorpool.ActorPool
+	peerState peerstate.PeersState
 }
 
-func (tr *Tracker) AddPool(name string, pool *actorpool.ActorPool) error {
+func (tr *Tracker) CreateActorPool(name string, allowRebalance bool) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
@@ -34,44 +37,35 @@ func (tr *Tracker) AddPool(name string, pool *actorpool.ActorPool) error {
 	if ok {
 		return ErrActorPoolAlreadyRegistered
 	}
-	tr.pools[name] = pool
+
+	ap := actorpool.New(allowRebalance, tr.peerState)
+	tr.pools[name] = ap
 	return nil
 }
 
-func (tr *Tracker) Live(peer string) {
+func (tr *Tracker) Live(peer string) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
-
-	for _, pool := range tr.pools {
-		pool.Live(peer)
-	}
+	return tr.peerState.Live(peer)
 }
 
-func (tr *Tracker) Dead(peer string) {
+func (tr *Tracker) Dead(peer string) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	for _, pool := range tr.pools {
-		pool.Dead(peer)
-	}
+	return tr.peerState.Dead(peer)
 }
 
-func (tr *Tracker) OptimisticallyLive(peer string) {
+func (tr *Tracker) OptimisticallyLive(peer string) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
-
-	for _, pool := range tr.pools {
-		pool.OptimisticallyLive(peer)
-	}
+	return tr.peerState.OptimisticallyLive(peer)
 }
 
-func (tr *Tracker) OptimisticallyDead(peer string) {
+func (tr *Tracker) OptimisticallyDead(peer string) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
-
-	for _, pool := range tr.pools {
-		pool.OptimisticallyDead(peer)
-	}
+	return tr.peerState.OptimisticallyDead(peer)
 }
 
 func (tr *Tracker) Register(poolName, actor, peer string) error {
@@ -107,21 +101,6 @@ func (tr *Tracker) PoolBy(name string) (*actorpool.ActorPool, error) {
 		return nil, ErrUnknownPoolName
 	}
 	return pool, nil
-}
-
-//returns a struct that represents all the peer queue's internal states used for logging and debugging
-// relocation issues.
-func (tr *Tracker) Status() *ClusterStatus {
-	tr.mu.Lock()
-	defer tr.mu.Unlock()
-
-	clusterState := map[string]*actorpool.PeersStatus{}
-	for name, pool := range tr.pools {
-		clusterState[name] = pool.Status()
-	}
-	return &ClusterStatus{
-		ClusterState: clusterState,
-	}
 }
 
 func (tr *Tracker) Missing() []*grid.ActorStart {
