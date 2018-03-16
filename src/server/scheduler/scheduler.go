@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/epsniff/gui/src/lib/logging"
-	"github.com/epsniff/gui/src/server/scheduler/peertracker"
+	"github.com/epsniff/gui/src/server/scheduler/tracker"
 	"github.com/lytics/grid"
 )
 
@@ -13,14 +13,14 @@ const actorStartTimeout = 10 * time.Second
 
 type Scheduler struct {
 	ctx     context.Context
-	tracker *peertracker.Tracker
+	tracker *tracker.Tracker
 	client  *grid.Client
 }
 
 func New(ctx context.Context, client *grid.Client) *Scheduler {
 	s := &Scheduler{
 		ctx:     ctx,
-		tracker: peertracker.New(),
+		tracker: tracker.New(),
 		client:  client,
 	}
 
@@ -38,7 +38,8 @@ func (sm *Scheduler) Run() error {
 	for _, c := range current {
 		logging.Logger.Infof("%v: found existing peer: %v", sm, c.Peer())
 		sm.tracker.Live(c.Peer())
-		if err := sm.startPeerMonitor(c.Peer()); err != nil {
+
+		if err := tracker.StartPeerMonitor(sm.client, c.Peer()); err != nil {
 			logging.Logger.Warnf("%v: failed to start peer monitor on: %v, error: %v", sm, c.Peer(), err)
 		}
 	}
@@ -57,7 +58,7 @@ func (sm *Scheduler) Run() error {
 				sm.tracker.Dead(e.Peer())
 			case grid.EntityFound:
 				sm.tracker.Live(e.Peer())
-				if err := peertracker.StartPeerMonitor(sm.client, e.Peer()); err != nil {
+				if err := tracker.StartPeerMonitor(sm.client, e.Peer()); err != nil {
 					logging.Logger.Warnf("%v: failed to start peer monitor on: %v, error: %v", sm, e.Peer(), err)
 				}
 			}

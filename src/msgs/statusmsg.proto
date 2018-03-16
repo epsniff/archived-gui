@@ -1,7 +1,0 @@
-syntax = "proto3";
-package msg;
-
-message PeerStatusMsg {
-    string Peer = 1;
-    bool Stopping = 2;
-}

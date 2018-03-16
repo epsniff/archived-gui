@@ -22,5 +22,8 @@ vendor-ensure:
 	echo '-- running dep prune to rmeove unused packages --'
 	dep prune -v
 
+proto-build:
+	# Build protobuffer for status actor
+	protoc --go_out=. ./src/server/scheduler/peer/monitor/statusmsg.proto
 
 
