@@ -1,18 +1,13 @@
 package tracker
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/epsniff/gui/src/server/scheduler/actor/placement"
 	actorpool "github.com/epsniff/gui/src/server/scheduler/actor/pool"
 	"github.com/epsniff/gui/src/server/scheduler/tracker/clusterstate"
+	"github.com/epsniff/gui/src/server/scheduler/types"
 	"github.com/lytics/grid"
-)
-
-var (
-	ErrActorPoolAlreadyRegistered = errors.New("actor pool name already registered")
-	ErrUnknownPoolName            = errors.New("unknown actor pool name")
 )
 
 type poolname string
@@ -20,27 +15,42 @@ type poolname string
 func New() *Tracker {
 	return &Tracker{
 		pools:     map[string]*actorpool.ActorPool{},
+		placers:   map[string]placement.Placement{},
 		peerState: clusterstate.New(),
 	}
 }
 
 type Tracker struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	pools     map[string]*actorpool.ActorPool
+	placers   map[string]placement.Placement
 	peerState clusterstate.PeersState
 }
 
-func (tr *Tracker) CreateActorPool(name string, placer placement.Placement) error {
+func (tr *Tracker) BestPeer(poolName string, def *grid.ActorStart) (string, error) {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+
+	placer, ok := tr.placers[poolName]
+	if !ok {
+		return "", types.ErrUnknownPoolName
+	}
+	return placer.BestPeer(def.Name, tr.peerState, tr.pools)
+}
+
+func (tr *Tracker) CreateActorPool(poolName string, placer placement.Placement) error {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	_, ok := tr.pools[name]
+	_, ok := tr.pools[poolName]
 	if ok {
-		return ErrActorPoolAlreadyRegistered
+		return types.ErrActorPoolAlreadyRegistered
 	}
 
 	ap := actorpool.New(tr.peerState)
-	tr.pools[name] = ap
+	tr.pools[poolName] = ap
+	tr.placers[poolName] = placer
+
 	return nil
 }
 
@@ -75,7 +85,7 @@ func (tr *Tracker) Register(poolName string, isRequired bool, actor *grid.ActorS
 
 	pool, ok := tr.pools[poolName]
 	if !ok {
-		return ErrUnknownPoolName
+		return types.ErrUnknownPoolName
 	}
 
 	return pool.Register(isRequired, actor, peer)
@@ -83,8 +93,8 @@ func (tr *Tracker) Register(poolName string, isRequired bool, actor *grid.ActorS
 }
 
 func (tr *Tracker) Pools() map[string]*actorpool.ActorPool {
-	tr.mu.Lock()
-	defer tr.mu.Unlock()
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
 
 	tmpCp := map[string]*actorpool.ActorPool{}
 	for key, pool := range tr.pools {
@@ -94,17 +104,20 @@ func (tr *Tracker) Pools() map[string]*actorpool.ActorPool {
 }
 
 func (tr *Tracker) PoolBy(name string) (*actorpool.ActorPool, error) {
-	tr.mu.Lock()
-	defer tr.mu.Unlock()
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
 
 	pool, ok := tr.pools[name]
 	if !ok {
-		return nil, ErrUnknownPoolName
+		return nil, types.ErrUnknownPoolName
 	}
 	return pool, nil
 }
 
 func (tr *Tracker) Missing() []*grid.ActorStart {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+
 	var all []*grid.ActorStart
 	for _, pool := range tr.pools {
 		defs := pool.Missing()
@@ -112,13 +125,3 @@ func (tr *Tracker) Missing() []*grid.ActorStart {
 	}
 	return all
 }
-
-/*
-func (tr *Tracker) BestPeer(def *grid.ActorStart) (string, error) {
-	pool, ok := tr.pools[def.Type]
-	if !ok {
-		return "", ErrUnknownActorType
-	}
-	return pool.ByHash(def.Name)
-}
-*/

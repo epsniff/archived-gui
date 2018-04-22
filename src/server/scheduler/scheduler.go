@@ -36,7 +36,7 @@ func (sm *Scheduler) Run() error {
 
 	logging.Logger.Infof("%v: found %v current peers", sm, len(current))
 	for _, c := range current {
-		logging.Logger.Infof("%v: found existing peer: %v", sm, c.Peer())
+		logging.Logger.Infof("%v: found existing peer: %v", sm, c.Peer()) 
 		sm.tracker.Live(c.Peer())
 
 		if err := tracker.StartPeerMonitor(sm.client, c.Peer()); err != nil {

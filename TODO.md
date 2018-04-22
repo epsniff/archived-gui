@@ -12,9 +12,11 @@
 
 ## Low Level
 
-- Refactor actor creation and management 
+- instead of using `index.Index` directly, is it fesable to use `bleve.NewUsing("/tmp/scorch", m, scorch.Name, scorch.Name, scorchOpts)`?  That is the highlevel implementation of bleve?  What are the implecations? 
+- Refactor actor creation and management.
   - Create a wrapper around the grid actor interface that adds some DEFAULT features to all GUI actors. Features:
     - HealthCheck messages (ping/pong): the wrapper should add a method to call actores that allow them to be pinged to see if they are active and running.
 - The current state machine logic in PeerState is pretty inflexible.  Refactor the PeerState logic to create a DFA state machine simlar to the way `lytics/dfa` is used to manage the actor's own life cycle, this new dfa libary should be useful for the scheduler to manage the life cycle.
 - Move the relocation tests from the actor-pool package to the relocation package.
 - Have a look at using Jump Hash for actor locations.  But it has bad distribution for low cardinality sets, see https://play.golang.org/p/JYn2IDUCLjz.
+

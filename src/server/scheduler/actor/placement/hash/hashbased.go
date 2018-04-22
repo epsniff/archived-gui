@@ -10,6 +10,10 @@ import (
 	"github.com/epsniff/gui/src/server/scheduler/types"
 )
 
+func New() *HashPlacement {
+	return &HashPlacement{}
+}
+
 type HashPlacement struct {
 }
 

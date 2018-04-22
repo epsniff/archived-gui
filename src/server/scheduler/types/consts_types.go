@@ -9,4 +9,7 @@ var (
 	ErrUnknownPeerName    = errors.New("unknown peer name")
 	ErrActorTypeMismatch  = errors.New("actor type mismatch")
 	ErrActorNotRegistered = errors.New("actor not registered")
+
+	ErrActorPoolAlreadyRegistered = errors.New("actor pool name already registered")
+	ErrUnknownPoolName            = errors.New("unknown actor pool name")
 )

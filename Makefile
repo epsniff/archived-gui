@@ -16,7 +16,7 @@ install-dep:
 vendor-ensure:
 	# Used to update or delete dependencies. Just don't forget to update `Gopkg.toml` before running.
 	#
-	[ "$(CURDEPVER)" == "$(DEPVERDEF)" ]
+	[ "$(CURDEPVER)" == "$(DEPVER)" ]
 	echo '-- running dep ensure --'
 	dep ensure -v
 	echo '-- running dep prune to rmeove unused packages --'
