@@ -10,7 +10,7 @@ import (
 func New(l *log.Logger, logLevel string) *GouLogger {
 	//gou.SetLogger(log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile|log.Lmicroseconds), "info")
 	gou.SetLogger(l, logLevel)
-	gou.SetColorOutput()
+	gou.SetColorOutput() //causes each serverity level to be printed in a differnt color.
 
 	return &GouLogger{}
 }

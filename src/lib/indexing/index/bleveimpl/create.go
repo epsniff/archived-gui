@@ -14,7 +14,7 @@ type Cfg struct {
 	Name     string
 	ReadOnly bool
 
-	Mappings *mapping.IndexMappingImpl
+	Mappings mapping.IndexMapping //most likely of type *mapping.IndexMappingImpl
 }
 
 func New(cfg *Cfg) (*BleveIndex, error) {
@@ -32,7 +32,11 @@ func New(cfg *Cfg) (*BleveIndex, error) {
 		return nil, fmt.Errorf("error creating scorch index: %v", err)
 	}
 
-	return &BleveIndex{&sync.RWMutex{}, newIndex}, nil
+	return &BleveIndex{
+		mu:       &sync.RWMutex{},
+		index:    newIndex,
+		mappings: cfg.Mappings,
+	}, nil
 
 	//newIndex, err := bleve.New(cfg.Path, cfg.Mappings)
 	//if err != nil {

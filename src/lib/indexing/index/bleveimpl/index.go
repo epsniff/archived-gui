@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/epsniff/gui/src/lib/indexing/shared"
 )
 
@@ -14,14 +14,13 @@ type BleveIndex struct {
 	mu *sync.RWMutex
 
 	index    index.Index
-	analyzer map[shared.FieldName]*analysis.Analyzer
+	mappings mapping.IndexMapping
 }
 
 func (b *BleveIndex) DocumentCount() (cnt uint64, err error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	// open a reader for this search
 	indexReader, err := b.index.Reader()
 	if err != nil {
 		return 0, fmt.Errorf("error opening index reader %v", err)
@@ -53,7 +52,7 @@ func (b *BleveIndex) DocumentDelete(docID string) (bool, error) {
 	return true, nil
 }
 
-func (b *BleveIndex) DocumentGet(docID string) (doc shared.Document, err error) {
+func (b *BleveIndex) DocumentGet(docID string) (doc *shared.Document, err error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -74,10 +73,16 @@ func (b *BleveIndex) DocumentGet(docID string) (doc shared.Document, err error) 
 		}
 	}()
 
-	doc, err = indexReader.Document(docID)
+	bdoc, err := indexReader.Document(docID)
 	if err != nil {
 		return nil, err
 	}
+
+	doc, err = b.bleveDocToDoc(bdoc)
+	if err != nil {
+		return nil, err
+	}
+
 	return doc, nil
 }
 
